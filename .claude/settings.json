@@ -1,0 +1,26 @@
+{
+  "permissions": {
+    "allow": [
+      "Bash(cat .adk/logs/*.log)",
+      "Read(//c/Users/aiautou/my-agent/.adk/bot/.botpress/dist/**)",
+      "Bash(grep -E \"\\\\.js$\")",
+      "Bash(grep -l \"toLowerCase\" \"c:\\\\Users\\\\aiautou\\\\my-agent\\\\node_modules\\\\@botpress\\\\runtime\\\\dist\"/*.js)",
+      "Bash(grep -E \"\\\\.\\(ts|js\\)$\")",
+      "Bash(grep -E \"\\\\.\\(js|cjs\\)$\")",
+      "Bash(find \"c:\\\\Users\\\\aiautou\\\\my-agent\\\\node_modules\\\\@botpress\\\\runtime\\\\dist\\\\runtime\\\\handlers\" -name \"*.d.ts\" -exec grep -l \"conversation\" {} \\\\;)",
+      "mcp__adk__adk_get_dev_logs",
+      "mcp__adk__adk_send_message",
+      "mcp__adk__adk_query_traces",
+      "Bash(python3)",
+      "Bash(python3 -c ':*)",
+      "Read(//tmp/**)",
+      "Bash(dd if=\"C:\\\\Users\\\\aiautou\\\\.claude\\\\projects\\\\c--Users-aiautou-my-agent\\\\20e8aa21-f1a4-405c-8575-f6cdeba21767\\\\tool-results\\\\toolu_01Bk9rZ88i93dKvLQy3dXYaq.json\" bs=1 skip=0 count=8000)",
+      "mcp__adk__adk_get_agent_info",
+      "Bash(dir /b \"c:\\\\Users\\\\aiautou\\\\my-agent\")"
+    ],
+    "additionalDirectories": [
+      "C:\\Users\\aiautou\\.claude\\projects\\c--Users-aiautou-my-agent\\20e8aa21-f1a4-405c-8575-f6cdeba21767\\tool-results",
+      "c:\\Users\\aiautou\\shorts-lab-starter"
+    ]
+  }
+}
