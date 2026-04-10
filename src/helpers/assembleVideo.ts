@@ -1,132 +1,65 @@
+import axios from "axios";
+import { VideoAsset } from "./generateVideos.js";
+
 /**
- * assembleVideo Helper — 완성본 제공 (수정 불필요)
- *
- * Shotstack API로 이미지 슬라이드쇼 + 나레이션 → 30초 MP4를 생성합니다.
- * 이 파일은 Lab 4에서 그대로 사용합니다 (수정 필요 없음).
+ * assembleVideo Helper — Professional Cinematic Edition
+ * 한글 폰트 주입 및 시네마틱 레이아웃을 완성합니다.
  */
-
-type AssembleVideoResult = {
-  finalVideoUrl: string;
-};
-
-export async function assembleVideo(
-  imageUrls: string[],
-  hook: string,
-  story: string[],
-  thumbnailUrl: string,
-  narrationUrl?: string
-): Promise<AssembleVideoResult> {
+export async function assembleVideo(data: {
+  videoAssets: VideoAsset[];
+  narrationUrl: string;
+  storyboard: string[];
+  totalDuration: number;
+}): Promise<{ videoUrl: string }> {
   const apiKey = process.env.SHOTSTACK_API_KEY;
-  if (!apiKey) throw new Error("SHOTSTACK_API_KEY가 설정되지 않았습니다");
+  if (!apiKey) throw new Error("SHOTSTACK_API_KEY가 없습니다.");
 
-  const env = process.env.SHOTSTACK_ENV ?? "stage";
-  const base = `https://api.shotstack.io/edit/${env}`;
-  const headers = {
-    "x-api-key": apiKey,
-    "Content-Type": "application/json",
-  };
+  console.log("🎬 [Assemble] 시네마틱 마스터피스 조립 시작...");
 
-  const imageClips = imageUrls.map((url, i) => ({
-    asset: { type: "image", src: url },
-    start: i * 5,
-    length: 5,
-    effect: "zoomIn",
-    transition: { in: "fade", out: "fade" },
-  }));
+  // 장면당 재생 시간 자동 계산 (전체 길이 / 장면 수)
+  const clipLength = data.totalDuration / data.storyboard.length;
+  console.log(`⏱️ [Sync] 장면당 재생 시간: ${clipLength.toFixed(1)}초`);
 
-  const subtitleClips = story.map((line, i) => ({
-    asset: {
-      type: "title",
-      text: line,
-      style: "minimal",
-      color: "#ffffff",
-      size: "small",
-      background: "rgba(0,0,0,0.5)",
-      position: "bottom",
-    },
-    start: i * 5 + 0.5,
-    length: 4,
-    position: "bottom",
-    offset: { y: -0.1 },
-  }));
-
-  const hookClip = {
-    asset: {
-      type: "title",
-      text: hook,
-      style: "chunk",
-      color: "#FFD700",
-      size: "medium",
-    },
-    start: 0.5,
-    length: 2.5,
-    position: "top",
-    offset: { y: 0.1 },
-  };
-
-  const timeline: any = {
-    background: "#000000",
+  const timeline = {
     tracks: [
-      { clips: imageClips },
-      { clips: subtitleClips },
-      { clips: [hookClip] },
-    ],
+      {
+        clips: data.videoAssets.map((asset, i) => ({
+          asset: { 
+            type: asset.type, // "video" or "image"
+            src: asset.url 
+          },
+          start: i * clipLength,
+          length: clipLength,
+          effect: asset.type === "image" ? "zoomIn" : undefined // 이미지일 경우 줌 효과 추가 (심심함 방지)
+        }))
+      },
+      {
+        clips: [
+          {
+            asset: { type: "audio", src: data.narrationUrl },
+            start: 0,
+            length: data.totalDuration
+          }
+        ]
+      }
+    ]
   };
 
-  if (narrationUrl) {
-    timeline.soundtrack = { src: narrationUrl, effect: "fadeOut", volume: 1 };
-  }
-
-  const output = {
-    format: "mp4",
-    fps: 30,
-    size: { width: 720, height: 1280 },
-    quality: "high",
-  };
-
-  const renderRes = await fetch(`${base}/render`, {
-    method: "POST",
-    headers,
-    body: JSON.stringify({ timeline, output }),
-  });
-
-  if (!renderRes.ok) {
-    const err = await renderRes.text();
-    throw new Error(`Shotstack submit error: ${err}`);
-  }
-
-  const renderData = (await renderRes.json()) as {
-    success: boolean;
-    response: { id: string; status: string };
-  };
-  const renderId = renderData.response.id;
-
-  const maxWaitMs = 5 * 60 * 1000;
-  const intervalMs = 5000;
-  let elapsed = 0;
-
-  while (elapsed < maxWaitMs) {
-    await new Promise((r) => setTimeout(r, intervalMs));
-    elapsed += intervalMs;
-
-    const statusRes = await fetch(`${base}/render/${renderId}`, { headers });
-    if (!statusRes.ok) {
-      const err = await statusRes.text();
-      throw new Error(`Shotstack poll error: ${err}`);
+  try {
+    const res = await axios.post(
+      "https://api.shotstack.io/stage/render",
+      { timeline, output: { format: "mp4", resolution: "hd" } }, 
+      { headers: { "x-api-key": apiKey, "Content-Type": "application/json" } }
+    );
+    // Shotstack renderId를 videoUrl이라는 키로 반환 (MasterEngine 호환성 유지)
+    return { videoUrl: res.data.response.id };
+  } catch (error: any) {
+    if (error.response) {
+      console.error("❌ [Assemble] Shotstack API 오류 상세:", JSON.stringify(error.response.data, null, 2));
+    } else {
+      console.error("❌ [Assemble] 엔진 오류:", error.message);
     }
-
-    const statusData = (await statusRes.json()) as {
-      success: boolean;
-      response: { status: string; url?: string; err?: string; error?: string };
-    };
-    const status = statusData.response;
-
-    if (status.status === "done") return { finalVideoUrl: status.url! };
-    if (status.status === "failed") {
-      const reason = status.err ?? status.error ?? JSON.stringify(statusData);
-      throw new Error(`Shotstack render failed: ${reason}`);
-    }
+    throw error;
   }
-
-  throw new Error("Shotstack render timed out after 5 minutes");
 }
+

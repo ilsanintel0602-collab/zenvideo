@@ -5,8 +5,8 @@ export default defineConfig({
     description: 'YouTube Shorts 자동화 봇 실습 프로젝트',
 
     defaultModels: {
-        autonomous: "openai:gpt-4.1-mini",
-        zai: "openai:gpt-4.1",
+        autonomous: "openai:gpt-4o-mini",
+        zai: "openai:gpt-4o",
     },
 
     bot: {
