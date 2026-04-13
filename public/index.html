@@ -23,6 +23,17 @@
             </div>
             
             <div class="input-group">
+                <label for="duration">⏱️ 영상 길이</label>
+                <div class="duration-selector">
+                    <button class="duration-btn" data-value="1">1분</button>
+                    <button class="duration-btn active" data-value="3">3분</button>
+                    <button class="duration-btn" data-value="5">5분</button>
+                    <button class="duration-btn" data-value="10">10분</button>
+                </div>
+                <input type="hidden" id="duration" value="3">
+            </div>
+
+            <div class="input-group">
                 <label for="passcode">🔐 보안 패스코드</label>
                 <input type="password" id="passcode" placeholder="Passcode를 입력하세요" required>
             </div>

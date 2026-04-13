@@ -12,7 +12,8 @@
     "emulator": "tsx src/local-emulator.ts",
     "deploy": "node node_modules/.pnpm/@botpress+cli@6.2.2_@bpinternal+zui@2.1.0_debug@4.4.3/node_modules/@botpress/cli/bin.js deploy",
     "create": "tsx src/final-check.ts",
-    "serve": "tsx src/server.ts"
+    "serve": "tsx src/server.ts",
+    "start": "tsx src/server.ts"
   },
   "dependencies": {
     "@botpress/runtime": "^1.17.0",

@@ -1,112 +1,119 @@
-import "dotenv/config";
 import express from 'express';
 import cors from 'cors';
 import bodyParser from 'body-parser';
+import dotenv from 'dotenv';
+import path from 'path';
+import { fileURLToPath } from 'url';
+import axios from 'axios';
 import { MasterEngine } from './engine/masterEngine.js';
 
-// --- [API Health Check] ---
-const requiredKeys = ["GEMINI_API_KEY", "PEXELS_API_KEY", "SHOTSTACK_API_KEY", "OPEN_AI_API_KEY"];
-console.log("🔍 [Security] API 키 무결성 검사 중...");
-requiredKeys.forEach(key => {
-  if (!process.env[key]) {
-    console.error(`⚠️ [Critical] 환경 변수 누락됨: ${key}`);
-  } else {
-    console.log(`✅ [Security] ${key} 로드 완료.`);
-  }
-});
-import axios from 'axios';
+dotenv.config();
+
+const __filename = fileURLToPath(import.meta.url);
+const __dirname = path.dirname(__filename);
 
 const app = express();
 const PORT = process.env.PORT || 3000;
-const PASSCODE = process.env.APP_PASSCODE || "1234";
+const PASSCODE = process.env.APP_PASSCODE || '1234';
 
+// Middleware
 app.use(cors());
 app.use(bodyParser.json());
-app.use(express.static('public'));
+app.use(express.static(path.join(__dirname, '../public')));
 
-process.on('uncaughtException', (err) => {
-  console.error('💥 [Global] Uncaught Exception:', err);
-});
-
-process.on('unhandledRejection', (reason, promise) => {
-  console.error('💥 [Global] Unhandled Rejection at:', promise, 'reason:', reason);
-});
-
-// --- [Security Middleware] ---
-const gatewaySecurity = (req: express.Request, res: express.Response, next: express.NextFunction) => {
-  const userPasscode = req.headers['x-gateway-passcode'] || req.body.passcode;
-  
-  if (userPasscode !== PASSCODE) {
-    console.warn(`🚨 [Security] Unauthorized access attempt from ${req.ip}`);
-    return res.status(401).json({ success: false, message: "Invalid Passcode. Access Denied." });
-  }
+// 실시간 요청 로그
+app.use((req, _res, next) => {
+  console.log(`[${new Date().toISOString()}] ${req.method} ${req.path}`);
   next();
-};
-
-// --- [Health Check] ---
-app.get('/', (req, res) => {
-  res.json({ status: "online", service: "ZenVideo Master API", version: "1.0.0" });
 });
 
-// --- [Video Generation Endpoint] ---
-app.post('/api/generate', gatewaySecurity, async (req, res) => {
-  const { topic } = req.body;
+// 임시 렌더 상태 저장소 (실제로는 DB 사용 권장)
+const renderJobs = new Map();
+
+// 패스코드 검증 미들웨어
+function verifyPasscode(req: express.Request, res: express.Response, next: express.NextFunction) {
+  const passcode = req.headers['x-gateway-passcode'] || req.body.passcode;
   
+  if (passcode !== PASSCODE) {
+    return res.status(403).json({ success: false, message: '잘못된 패스코드입니다.' });
+  }
+  
+  next();
+}
+
+// POST /api/generate - 영상 생성 시작
+app.post('/api/generate', verifyPasscode, async (req, res) => {
+  const { topic, duration } = req.body;
+
   if (!topic) {
-    return res.status(400).json({ success: false, message: "Topic is required." });
+    return res.status(400).json({ success: false, message: '주제를 입력해주세요.' });
   }
 
-  console.log(`📡 [API] Received generation request for: "${topic}"`);
-  
-  // We trigger the engine but don't wait for the long render to finish before responding
-  const result = await MasterEngine.create(topic);
+  const minutes = [1, 3, 5, 10].includes(Number(duration)) ? Number(duration) : 3;
+  console.log(`📝 영상 생성 요청: ${topic} (${minutes}분)`);
 
-  if (result.success) {
-    res.json({
-      success: true,
-      message: "Production started successfully.",
-      renderId: result.videoUrl,
-      status: "rendering"
+  const result = await MasterEngine.create(topic, minutes);
+
+  if (!result.success || !result.renderId) {
+    return res.status(500).json({
+      success: false,
+      message: result.error || '영상 생성에 실패했습니다.'
     });
-  } else {
-    console.error("🚨 [Critical Error] Generation Failed:", result.error);
+  }
+
+  renderJobs.set(result.renderId, { status: 'queued', percentage: 0, createdAt: new Date() });
+
+  res.json({
+    success: true,
+    message: '영상 생성이 시작되었습니다.',
+    renderId: result.renderId
+  });
+});
+
+// GET /api/status/:renderId - 렌더링 상태 확인
+app.get('/api/status/:renderId', verifyPasscode, async (req, res) => {
+  try {
+    const renderId = String(req.params.renderId);
+
+    // Shotstack API로 상태 확인
+    const status = await getShotstackRenderStatus(renderId);
+
+    res.json(status);
+
+  } catch (error: any) {
+    console.error('❌ /api/status 에러:', error);
     res.status(500).json({
       success: false,
-      message: "Failed to start production. Check server logs.",
-      error: typeof result.error === 'string' ? result.error : JSON.stringify(result.error)
+      message: error.message
     });
   }
 });
 
-// --- [Status Check Endpoint] ---
-app.get('/api/status/:id', async (req, res) => {
-  const renderId = req.params.id;
-  const apiKey = process.env.SHOTSTACK_API_KEY;
 
-  try {
-    const statusRes = await axios.get(`https://api.shotstack.io/stage/render/${renderId}`, {
-      headers: { "x-api-key": apiKey }
-    });
-    
-    const shotstackResponse = statusRes.data.response;
-    
-    res.json({
-      success: true,
-      status: shotstackResponse.status, // done, rendering, failed, etc.
-      url: shotstackResponse.url || null,
-      percentage: shotstackResponse.percentage || 0
-    });
-  } catch (error: any) {
-    res.status(500).json({ success: false, message: "Status check failed.", error: error.message });
-  }
+async function getShotstackRenderStatus(renderId: string): Promise<any> {
+  const SHOTSTACK_API_KEY = process.env.SHOTSTACK_API_KEY;
+  const SHOTSTACK_ENV = process.env.SHOTSTACK_ENV || 'stage';
+
+  const response = await axios.get(
+    `https://api.shotstack.io/${SHOTSTACK_ENV}/render/${renderId}`,
+    {
+      headers: { 'x-api-key': SHOTSTACK_API_KEY }
+    }
+  );
+
+  const data = response.data.response;
+
+  return {
+    status: data.status, // queued, rendering, done, failed
+    percentage: Math.round((data.progress || 0) * 100),
+    url: data.url || null
+  };
+}
+
+// 서버 시작 (0.0.0.0 — 같은 WiFi 기기에서도 접속 가능)
+app.listen(Number(PORT), '0.0.0.0', () => {
+    console.log(`🏛️  [ZenVideo Gateway] Server is running!`);
+    console.log(`🖥️  내 PC:        http://127.0.0.1:${PORT}`);
+    console.log(`📱  같은 WiFi:    http://192.168.219.92:${PORT}`);
+    console.log(`🔐  패스코드:     ${PASSCODE}`);
 });
-
-app.listen(PORT, () => {
-  console.log(`🏛️  [ZenVideo Gateway] Server is running on http://localhost:${PORT}`);
-  console.log(`🔐 [Security] Gateway Passcode active.`);
-});
-
-// Keep-alive mechanism to prevent early exit in certain CI/CD or restricted environments
-setInterval(() => {
-  // Do nothing, just keep the process alive
-}, 1000 * 60 * 60);

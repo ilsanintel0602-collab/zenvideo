@@ -1,7 +1,17 @@
 document.addEventListener('DOMContentLoaded', () => {
     const topicInput = document.getElementById('topic');
     const passcodeInput = document.getElementById('passcode');
+    const durationInput = document.getElementById('duration');
     const generateBtn = document.getElementById('generate-btn');
+
+    // 상영시간 버튼 선택
+    document.querySelectorAll('.duration-btn').forEach(btn => {
+        btn.addEventListener('click', () => {
+            document.querySelectorAll('.duration-btn').forEach(b => b.classList.remove('active'));
+            btn.classList.add('active');
+            durationInput.value = btn.dataset.value;
+        });
+    });
     const setupForm = document.getElementById('setup-form');
     const statusPanel = document.getElementById('status-panel');
     const resultPanel = document.getElementById('result-panel');
@@ -15,6 +25,7 @@ document.addEventListener('DOMContentLoaded', () => {
     generateBtn.addEventListener('click', async () => {
         const topic = topicInput.value.trim();
         const passcode = passcodeInput.value.trim();
+        const duration = parseInt(durationInput.value) || 3;
 
         if (!topic || !passcode) {
             alert('주제와 패스코드를 모두 입력해주세요!');
@@ -34,7 +45,7 @@ document.addEventListener('DOMContentLoaded', () => {
                     'Content-Type': 'application/json',
                     'x-gateway-passcode': passcode
                 },
-                body: JSON.stringify({ topic, passcode })
+                body: JSON.stringify({ topic, passcode, duration })
             });
 
             const data = await response.json();

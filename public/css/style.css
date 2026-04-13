@@ -132,6 +132,37 @@ header {
     display: none;
 }
 
+/* 상영시간 선택 버튼 */
+.duration-selector {
+    display: flex;
+    gap: 10px;
+    margin-top: 8px;
+}
+
+.duration-btn {
+    flex: 1;
+    padding: 10px;
+    background: transparent;
+    color: var(--text-muted);
+    border: 1px solid var(--glass-border);
+    border-radius: 10px;
+    font-size: 0.95rem;
+    font-weight: 600;
+    cursor: pointer;
+    transition: all 0.2s ease;
+}
+
+.duration-btn:hover {
+    border-color: var(--primary-color);
+    color: var(--primary-color);
+}
+
+.duration-btn.active {
+    background: linear-gradient(135deg, var(--primary-color), var(--secondary-color));
+    color: white;
+    border-color: transparent;
+}
+
 /* Status Panel Styling */
 .status-box {
     padding: 20px 0;
