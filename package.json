@@ -3,7 +3,7 @@
   "version": "1.0.0",
   "description": "Botpress ADK 실습 - YouTube Shorts 영상 자동화 봇",
   "type": "module",
-  "packageManager": "pnpm@latest",
+  "packageManager": "pnpm@10.33.0",
   "scripts": {
     "login": "node node_modules/.pnpm/@botpress+cli@6.2.2_@bpinternal+zui@2.1.0_debug@4.4.3/node_modules/@botpress/cli/bin.js login",
     "dev": "node node_modules/.pnpm/@botpress+cli@6.2.2_@bpinternal+zui@2.1.0_debug@4.4.3/node_modules/@botpress/cli/bin.js dev",
